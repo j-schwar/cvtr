@@ -34,6 +34,16 @@ impl Opt {
     fn has_conversion_flag(&self) -> bool {
         self.display_bin || self.display_dec || self.display_hex || self.display_oct
     }
+
+    /// If no conversion flags are set, set them all.
+    fn prep_conversion_flags(&mut self) {
+        if !self.has_conversion_flag() {
+            self.display_bin = true;
+            self.display_dec = true;
+            self.display_hex = true;
+            self.display_oct = true;
+        }
+    }
 }
 
 /// Determines the radix of a numeric string retuning the radix along with a
@@ -78,11 +88,8 @@ fn display(n: u32, opt: &Opt) {
 /// Runs the main program body so that we can wrap the result in a call to
 /// `std::process::exit` for various exit codes.
 fn run() -> Result<(), ()> {
-    let opt = Opt::from_args();
-    if !opt.has_conversion_flag() {
-        eprintln!("base: at least one conversion flag must be supplied");
-        return Err(());  
-    };
+    let mut opt = Opt::from_args();
+    opt.prep_conversion_flags();  
     let (radix, num) = match opt.radix {
         Some(r) => (r, opt.number.as_str()),
         None => extract_radix(&opt.number)
