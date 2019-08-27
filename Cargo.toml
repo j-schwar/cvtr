@@ -1,0 +1,8 @@
+[package]
+name = "cvtr"
+version = "0.1.0"
+authors = ["Jeremy Schwartz <j.schwartz564@icloud.com>"]
+edition = "2018"
+
+[dependencies]
+structopt = "0.2"
