@@ -5,22 +5,20 @@
 # Usage
 ```
 $ cvtr --help
-cvtr 0.1.0
-CLI numeric base converter
-
 USAGE:
-    cvtr [FLAGS] [OPTIONS] <number>
+    cvtr [FLAGS] <number>
 
 FLAGS:
-    -b, --bin        Convert number to binary
-    -d, --dec        Convert number to decimal
-    -x, --hex        Convert number to hexadecimal
-    -o, --oct        Convert number to octal
+    -b               Convert number to binary
+    -d               Convert number to decimal
+    -x               Convert number to hexadecimal
+    -o               Convert number to octal
+    -B               Convert number from binary
+    -D               Convert number from decimal
+    -X               Convert number from hexadecimal
+    -O               Convert number from octal
     -h, --help       Prints help information
     -V, --version    Prints version information
-
-OPTIONS:
-    -r, --radix <radix>    Radix of input number
 
 ARGS:
     <number>    Number to convert
@@ -32,12 +30,19 @@ From hex to decimal
 
 ```
 $ cvtr -d 0x20
-decimal: 32
+decimal:   32
+```
+
+Or without a prefix, using `-X` to specify a input radix of 16
+
+```
+$ cvtr -Xd 20
+decimal:   32
 ```
 
 From decimal to hex
 
 ```
 $ cvtr -x 32
-hex:     20
+hex:       20
 ```

@@ -1,111 +1,123 @@
 extern crate structopt;
 
+use cvtr::radix;
 use structopt::StructOpt;
+
+#[derive(Debug, PartialEq)]
+enum ArgumentError {
+    MultipleInputRadixFlags,
+}
+
+impl std::fmt::Display for ArgumentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            ArgumentError::MultipleInputRadixFlags => write!(f, "multiple input radices defined"),
+        }
+    }
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "CLI numeric base converter", author = "")]
 struct Opt {
     /// Convert number to hexadecimal
-    #[structopt(short = "x", long = "hex")]
+    #[structopt(short = "x")]
     display_hex: bool,
 
+    /// Convert number from hexadecimal
+    #[structopt(short = "X")]
+    from_hex: bool,
+
     /// Convert number to decimal
-    #[structopt(short = "d", long = "dec")]
+    #[structopt(short = "d")]
     display_dec: bool,
 
+    /// Convert number from decimal
+    #[structopt(short = "D")]
+    from_dec: bool,
+
     /// Convert number to octal
-    #[structopt(short = "o", long = "oct")]
+    #[structopt(short = "o")]
     display_oct: bool,
 
+    /// Convert number from octal
+    #[structopt(short = "O")]
+    from_oct: bool,
+
     /// Convert number to binary
-    #[structopt(short = "b", long = "bin")]
+    #[structopt(short = "b")]
     display_bin: bool,
 
-    /// Radix of input number
-    #[structopt(short = "r", long = "radix")]
-    radix: Option<u32>,
+    /// Convert number from binary
+    #[structopt(short = "B")]
+    from_bin: bool,
 
     /// Number to convert
     number: String,
 }
 
 impl Opt {
-    /// Returns `true` if this `Opt` has at least one conversion flag set.
-    fn has_conversion_flag(&self) -> bool {
-        self.display_bin || self.display_dec || self.display_hex || self.display_oct
-    }
-
-    /// If no conversion flags are set, set them all.
-    fn prep_conversion_flags(&mut self) {
-        if !self.has_conversion_flag() {
-            self.display_bin = true;
-            self.display_dec = true;
-            self.display_hex = true;
-            self.display_oct = true;
+    /// Returns the output radices to convert to.
+    fn get_output_radices(&self) -> Vec<u32> {
+        if !self.display_bin && !self.display_oct && !self.display_dec && !self.display_hex {
+            return vec![2, 8, 10, 16];
         }
+        let mut v = Vec::new();
+        let mut cond_push = |flag, radix| {
+            if flag {
+                v.push(radix);
+            };
+        };
+        cond_push(self.display_bin, 2);
+        cond_push(self.display_oct, 8);
+        cond_push(self.display_dec, 10);
+        cond_push(self.display_hex, 16);
+        v
     }
-}
 
-/// Determines the radix of a numeric string retuning the radix along with a
-/// slice of the string without the radix marker.
-/// 
-/// # Examples
-/// 
-/// ```
-/// assert_eq!(extract_radix("0x100a"), (16, "100a"));
-/// ```
-/// 
-/// # Panics
-/// 
-/// This function panics if `number` is an empty string.
-fn extract_radix(number: &str) -> (u32, &str) {
-    assert!(number.len() != 0);
-    if number.len() > 2 && &number[0..2] == "0x" {
-        return (16, &number[2..]);
-    }
-    if number.len() > 1 && &number[0..1] == "0" {
-        return (8, &number[1..]);
-    }
-    (10, &number)
-}
-
-/// Displays `n` using the various bases set by flags in `opt`.
-fn display(n: u32, opt: &Opt) {
-    if opt.display_bin {
-        println!("binary:  {:b}", n);
-    }
-    if opt.display_dec {
-        println!("decimal: {}", n);
-    }
-    if opt.display_hex {
-        println!("hex:     {:x}", n);
-    }
-    if opt.display_oct {
-        println!("octal:   {:o}", n);
+    /// Returns the radix of the input number.
+    fn get_input_radix(&self) -> Result<Option<u32>, ArgumentError> {
+        let mut input_radix = None;
+        let check = |flag| {
+            if input_radix != None {
+                Err(ArgumentError::MultipleInputRadixFlags)
+            } else {
+                Ok(flag)
+            }
+        };
+        input_radix = if check(self.from_bin)? {
+            Some(2)
+        } else if check(self.from_oct)? {
+            Some(8)
+        } else if check(self.from_dec)? {
+            Some(10)
+        } else if check(self.from_hex)? {
+            Some(16)
+        } else {
+            None
+        };
+        Ok(input_radix)
     }
 }
 
 /// Runs the main program body so that we can wrap the result in a call to
 /// `std::process::exit` for various exit codes.
 fn run() -> Result<(), ()> {
-    let mut opt = Opt::from_args();
-    opt.prep_conversion_flags();  
-    let (radix, num) = match opt.radix {
-        Some(r) => (r, opt.number.as_str()),
-        None => extract_radix(&opt.number)
-    };
-    let n = u32::from_str_radix(num, radix);
-    if n.is_err() {
-        eprintln!("base: failed to parse '{}' with radix = {}", num, radix);
-        return Err(());
-    };
-    display(n.unwrap(), &opt);
+    let opt = Opt::from_args();
+    let input_radix = opt.get_input_radix().map_err(|e| println!("{}", e))?;
+    let output_radices = opt.get_output_radices();
+    let (prefix, number) = radix::strip_prefix(&opt.number);
+    let input_radix = input_radix.unwrap_or_else(|| radix::detect(prefix).unwrap());
+    for out_radix in output_radices {
+        let converted =
+            radix::convert(number, input_radix, out_radix).map_err(|e| println!("{}", e))?;
+        println!("{:<10} {}", radix::as_text(out_radix) + ":", converted);
+    }
     Ok(())
 }
 
 fn main() {
     std::process::exit(match run() {
         Ok(()) => 0,
-        Err(()) => 1
+        Err(()) => 1,
     })
 }
